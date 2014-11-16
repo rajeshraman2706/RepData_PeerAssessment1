@@ -1,8 +1,11 @@
 Peer Assignment 1
+
 First I loaded the data and created a histogram of average steps per time interval
 
 install.packages("ggplot2")
+
 library(ggplot2)
+
 activity = read.csv("c:/users/teddy/dropbox/coursera/r courses/workspace/data/activity.csv")
 
 The mean and median steps per day are displayed on the chart

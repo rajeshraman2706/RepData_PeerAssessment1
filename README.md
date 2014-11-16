@@ -99,7 +99,6 @@ the dataset.
 
 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 
-
 ### Imputing missing values
 
 Note that there are a number of days/intervals where there are missing

@@ -1,83 +1,71 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+Peer Assignment 1
+First I loaded the data and created a histogram of average steps per time interval
 
+install.packages("ggplot2")
+library(ggplot2)
+activity = read.csv("c:/users/teddy/dropbox/coursera/r courses/workspace/data/activity.csv")
 
-## Loading and preprocessing the data
-activity <- read.csv("activity.csv", header = TRUE)
-activity <- transform(activity, date = as.Date(date))
+The mean and median steps per day are displayed on the chart
 
-## What is mean total number of steps taken per day?
-stepsPerDay <- ddply(activity, ~date, summarise, steps = sum(steps))
-p <- ggplot(stepsPerDay, aes(steps))
-p <- p + geom_histogram(fill = "white", color = "black")
-p <- p + ggtitle("Total number of steps per day")
-p + xlab("Steps per day")
+stepsPerDay = xtabs(steps ~ date , data = activity)
+hist(stepsPerDay, xlab = "Steps Per Day", main = "")
+abline(v = mean(stepsPerDay) , col = "red", lwd = 4)
+abline(v = median(stepsPerDay) , col = "blue", lwd = 4)
+legend("topright", legend = c(paste("Mean is", round(mean(stepsPerDay),1)),paste("Median is ", round(median(stepsPerDay),1))), col = c("red", "blue"), lty = 1)
+Now I create a time series chart with the average number of steps per interval
 
-meanStepsPerDay <- mean(stepsPerDay$steps, na.rm = TRUE)
-medianStepsPerDay <- median(stepsPerDay$steps, na.rm = TRUE)
+First I get the average steps per interval
 
+stepsPerInterval = xtabs(steps ~ interval, data = activity)
+stepsPerIntervalDF = data.frame(stepsPerInterval)
+stepsPerIntervalDF$interval = as.numeric(levels(stepsPerIntervalDF$interval))
+names(stepsPerIntervalDF) = c("interval", "steps")
+Then I get a more readable x-axis
 
-## What is the average daily activity pattern?
-avgStepsPerInterval <- ddply(activity, ~interval, summarise, mean = mean(steps, na.rm = T))
-p <- ggplot(avgStepsPerInterval, aes(interval, mean)) + geom_line()
-p <- p + ggtitle("The average daily activity pattern")
-p + xlab("Interval") + ylab("Number of steps")
+stepsPerIntervalDF$interval = floor(stepsPerIntervalDF$interval / 100) * 60 + stepsPerIntervalDF$interval %% 100
+actualSeconds = stepsPerIntervalDF$interval * 60
+unformattedTime = as.POSIXct(actualSeconds, origin = "1970-01-01", tz = "GMT")
+formattedTime = format(unformattedTime, format = "%H:%M")
+Now I plot the data and have with the x-axis having a tick mark every two hours.
 
-## 5-minute interval that contains the maximum number of steps on average across all the days in the dataset.
-maxId <- which.max(avgStepsPerInterval$mean)
-maxInterval <- avgStepsPerInterval$interval[maxId]
+specificObs = seq(1, length(stepsPerIntervalDF$interval), 24)
+maxIndex = match(max(stepsPerIntervalDF$steps), stepsPerIntervalDF$steps)
+The interval with maximum steps is plotted on the graph
 
-## Imputing missing values
-numberRowNAs <- sum(apply(is.na(activity), 1, any))
+ggplot(stepsPerIntervalDF, aes(x = interval, y = steps)) + geom_line() + scale_x_discrete(breaks = stepsPerIntervalDF$interval[specificObs],labels = formattedTime[specificObs]) + geom_text(data = stepsPerIntervalDF[maxIndex,], label = paste("Max steps were",max(stepsPerIntervalDF$steps), "at time",formattedTime[maxIndex]), vjust = -.45, color = "red")
+The total number of NA's are found
 
-## function to replace the NA's step by the mean of 5-minute interval averaged across all days.
-na.replace <- function(act) {
-    ddply(act, ~interval, function(dd) {
-        steps <- dd$steps
-        dd$steps[is.na(steps)] <- mean(steps, na.rm = TRUE)
-        return(dd)
-    })
-}
-## Create a new dataset that is equal to the original dataset but with the missing data filled in.
+sum(is.na(activity$steps))
+Each NA value will be replaced by the mean number of steps of its corresponding 5 minute interval.
 
-imputedActivity <- na.replace(activity)
-## Find the total number of steps taken each day.
+A new dataset is created
 
-imputedStepsPerDay <- ddply(imputedActivity, ~date, summarise, steps = sum(steps))
-## Make a histogram of the total number of steps taken each day.
+meanPer5MinuteInterval = aggregate(steps ~ interval, data = activity, mean)
+activityNoNA = merge(activity, meanPer5MinuteInterval, by.x = "interval", by.y="interval")
+activityNoNA$steps.x[is.na(activityNoNA$steps.x)]=activityNoNA$steps.y[is.na(activityNoNA$steps.x)]
 
-p <- ggplot(imputedStepsPerDay, aes(steps))
-p <- p + geom_histogram(fill = "white", color = "black")
-p <- p + ggtitle("Total number of steps per day")
-p + xlab("Steps per day")
+#format and rename column of activityMeanNoNA
+activityNoNA = activityNoNA[,1:3]
+names(activityNoNA)[2] = "steps"
+A new histogram is created for steps per day with all the NA values replaced
 
-## Calculate mean and median total number of steps taken per day.
+#histogram without NA
+stepsPerDayNoNA = xtabs(steps ~ date , data = activityNoNA)
+hist(stepsPerDayNoNA, xlab = "Steps Per Day", main = "Histogram with NA's replaced by mean 5 minute interval")
+abline(v = mean(stepsPerDayNoNA) , col = "red", lwd = 4)
+abline(v = median(stepsPerDayNoNA) , col = "blue", lwd = 4)
+legend("topright", legend = c(paste("New mean is", round(mean(stepsPerDayNoNA),1)),paste("New median is ", round(median(stepsPerDayNoNA),1))), col = c("red", "blue"), lty = 1)
+The mean and median are now both the same due to the large number of NA's. The mean has increased about 10%, while the median has remained relatively unchanged.
 
-imputedMeanStepsPerDay <- mean(imputedStepsPerDay$steps)
-imputedMedianStepsPerDay <- median(imputedStepsPerDay$steps)
+For the final chart, each day was categorized as a weekday or a weekend and then a time series graph was plottted comparing the two
 
-## Are there differences in activity patterns between weekdays and weekends?
-## Create a new factor variable weekpart in the dataset with two levels “weekday” and “weekend”.
-
-weekParts <- c("Weekday", "Weekend")
-date2weekpart <- function(date) {
-    day <- weekdays(date)
-    part <- factor("Weekday", weekParts)
-    if (day %in% c("Saturday", "Sunday")) 
-        part <- factor("Weekend", weekParts)
-    return(part)
-}
-
-imputedActivity$weekpart <- sapply(imputedActivity$date, date2weekpart)
-## Make a panel plot containing a time series plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days.
-
-avgSteps <- ddply(imputedActivity, .(interval, weekpart), summarise, mean = mean(steps))
-
-p <- ggplot(avgSteps, aes(x = interval, y = mean))
-p <- p + geom_line() + facet_grid(. ~ weekpart, )
-p <- p + ggtitle("Activity patterns on weekends and weekdays")
-p + xlab("Interval") + ylab("Number of steps")
+#get type of day
+dayType = data.frame(day = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "sunday"), type = c("weekday", "weekday","weekday","weekday","weekday","weekend", "weekend"))
+activityNoNA$weekday = weekdays(as.Date(activityNoNA$date))
+activityDay=merge(activityNoNA, dayType, by.x = "weekday", by.y = "day")
+weekdayStepsPerInterval = aggregate(steps ~ interval, data = activityDay[activityDay$type == "weekday",], mean)
+weekendStepsPerInterval = aggregate(steps ~ interval, data = activityDay[activityDay$type == "weekend",], mean)
+par(mfrow = c(2,1))
+with(weekendStepsPerInterval, plot(interval, steps, type = "l", main = "Weekend Steps"))
+with(weekdayStepsPerInterval, plot(interval, steps, type = "l", main = "Weekday Steps"))
+It appears that during the weekend this person started their day later and ended it earlier. This is seen by the number of steps starting later in the day with more steps being taken later in the day. It also looks like there were more overall steps taken during the afternoon during weekends. The peak number of steps for both weekends and weekdays seemed to coincide around 9 a.m.
